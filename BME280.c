@@ -5,9 +5,9 @@
 #define FORCED_MODE 0x25    // Oversampling set to x1
 #define NORMAL_MODE 0x27    // Oversampling set to x1
 
-#define CTRL_HUM 0xF2
-#define STATUS_REG 0xF3
-#define CTRL_MEAS 0xF4
+#define CTRL_HUM 0xF2       // Humidity control register
+#define STATUS_REG 0xF3 
+#define CTRL_MEAS 0xF4      // Temperature and pressure control register
 #define CONFIG_REG 0xF5
 
 #define PRESS_LSB 0xF8
@@ -69,7 +69,6 @@ typedef struct{
 
 
 // Read temperature into bme280 data type structure
-// Reads MSB first then LSB
 void read_temperature(bme280_uncomp_data *data)
 {
     uint8_t temp[1];
@@ -117,6 +116,76 @@ uint16_t get_humidity(void)
     uint8_t hum_val[1];
     I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, hum_val, 2);
     return hum_val = ((uint16_t)hum_val[0] << 8) | hum_val[1];
+}
+
+// Burst read of all the data in the data register.
+void read_all(bme280_uncomp_data *data){
+    //  Burst read from 0xF7 to 0xFE
+    uint8_t temp[8];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_LSB, temp, 8);
+
+    data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
+    data->temperature = ((temp[3] << 8) | temp[4]) << 8 | temp[5];
+    data->humidity = (temp[6] <<8) | temp[7];
+}
+
+/*  Controls oversampling of humidity data. */
+static void bme280_osrs_h_x1(){
+    uint8_t osrs_h = 0x03;  //  oversampling x1
+
+    uint8_t reg_value = I2C1_Read1ByteRegister(BME280_CHIP_ID, CTRL_HUM);
+    reg_value = reg_value | osrs_h;
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_HUM, reg_value);
+}
+
+/*  Sets the normal mode with default oversampling (1x)    
+    T oversampling set to x1
+    P oversampling set to x1
+    Normal mode 11                                      */
+static void default_normal_mode(void){
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, NORMAL_MODE);
+}
+
+/*  Sets the sleep mode with default oversampling (1x)    
+    T oversampling set to x1
+    P oversampling set to x1
+    Sleep mode 00                                       */
+static void default_sleep_mode(void){
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
+}
+
+/*
+MEASUREMENT TIME = 8 ms
+ODR_max = 1000/8 = 125 Hz
+Cycle time = MEASUREMENT TIME + t_sb = 1008 ms = 1.008s
+*/
+void default_init(void){
+
+    // Sleep mode to get access to all registers
+    default_sleep_mode();
+    // Set oversampling to x1 for humidity
+    bme280_osrs_h_x1();
+    // Set config register do fault values
+    default_config_reg();
+    // Set Forced mode
+    default_forced_mode();
+}
+
+/*  Sets the forced mode with default oversampling (1x)    
+    T oversampling set to x1
+    P oversampling set to x1
+    Forced mode 01                                     */
+void default_forced_mode(){
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
+}
+/*  t_sb = 1000ms between 2 measurements    
+    Filter OFF
+    3-wire SPI mode OFF     */
+void default_config_reg(){
+    uint8_t register = I2C1_Read1ByteRegister(BME280_CHIP_ID, CONFIG_REG);
+    uint8_t preset = 0xA0;
+    preset = preset | register;
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CONFIG_REG, preset);
 }
 
 static void read_calibration_data(bme280_calib_data *data) {
@@ -268,73 +337,4 @@ static void bme280_compensate_data(const struct bme280_uncomp_data *uncomp_data,
     /*  Compensate the humidity data     */
     comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
     }
-}
-// Burst read of all the data in the data register.
-void read_all(bme280_uncomp_data *data){
-    //  Burst read from 0xF7 to 0xFE
-    uint8_t temp[8];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_LSB, temp, 8);
-
-    data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
-    data->temperature = ((temp[3] << 8) | temp[4]) << 8 | temp[5];
-    data->humidity = (temp[6] <<8) | temp[7];
-}
-
-/*  Controls oversampling of humidity data. */
-static void bme280_osrs_h_x1(){
-    uint8_t osrs_h = 0x03;  //  oversampling x1
-
-    uint8_t reg_value = I2C1_Read1ByteRegister(BME280_CHIP_ID, CTRL_HUM);
-    reg_value = reg_value | osrs_h;
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_HUM, reg_value);
-}
-
-/*  Sets the normal mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Normal mode 11                                      */
-static void default_normal_mode(void){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, NORMAL_MODE);
-}
-
-/*  Sets the sleep mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Sleep mode 00                                       */
-static void default_sleep_mode(void){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
-}
-
-/*
-MEASUREMENT TIME = 8 ms
-ODR_max = 1000/8 = 125 Hz
-Cycle time = MEASUREMENT TIME + t_sb = 1008 ms = 1.008s
-*/
-void default_init(void){
-
-    // Sleep mode to get access to all registers
-    default_sleep_mode();
-    // Set oversampling to x1 for humidity
-    bme280_osrs_h_x1();
-    // Set config register do fault values
-    default_config_reg();
-    // Set Forced mode
-    default_forced_mode();
-}
-
-/*  Sets the forced mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Forced mode 01                                     */
-void default_forced_mode(){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
-}
-/*  t_sb = 1000ms between 2 measurements    
-    Filter OFF
-    3-wire SPI mode OFF     */
-void default_config_reg(){
-    uint8_t register = I2C1_Read1ByteRegister(BME280_CHIP_ID, CONFIG_REG);
-    uint8_t preset = 0xA0;
-    preset = preset | register;
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CONFIG_REG, preset);
 }
