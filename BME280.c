@@ -331,14 +331,10 @@ void default_forced_mode(){
 }
 /*  t_sb = 1000ms between 2 measurements    
     Filter OFF
-    3-wire SPI mode OFF
-*/
+    3-wire SPI mode OFF     */
 void default_config_reg(){
     uint8_t register = I2C1_Read1ByteRegister(BME280_CHIP_ID, CONFIG_REG);
-    /*  t_sb = 1000ms between 2 measurements    
-        Filter OFF
-    */
-   uint8_t preset = 0xA0;
-   preset = preset | register;
-   I2C1_Write1ByteRegister(BME280_CHIP_ID, CONFIG_REG, preset);
+    uint8_t preset = 0xA0;
+    preset = preset | register;
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CONFIG_REG, preset);
 }
