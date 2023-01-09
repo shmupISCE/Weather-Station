@@ -10,11 +10,13 @@
 #define CTRL_MEAS 0xF4      // Temperature and pressure control register
 #define CONFIG_REG 0xF5
 
-#define PRESS_LSB 0xF8
 #define PRESS_MSB 0xF7
+#define PRESS_LSB 0xF8
+#define PRESS_XLSB 0xF9
 
 #define TEMP_MSB 0xFA
 #define TEMP_LSB 0xFB
+#define TEMP_XLSB 0xFC
 
 #define HUM_MSB 0xFD
 #define HUM_LSB 0xFE
@@ -71,43 +73,43 @@ typedef struct{
 // Read temperature into bme280 data type structure
 void read_temperature(bme280_uncomp_data *data)
 {
-    uint8_t temp[1];
-    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp, 2);
-    data->temperature = (temp[0] << 8) | temp[1];
+    uint8_t temp[3];
+    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp, 3);
+    data->temperature = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
 }
 
 // Read pressure into bme280 data type structure
 void read_pressure(bme280_uncomp_data *data)
 {
-    uint8_t temp[1];
-    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, temp, 2);
-    data->pressure = (temp[0] << 8) | temp[1];
+    uint8_t temp[3];
+    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, temp, 3);
+    data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
 }
 
 // Read humidity into bme280 data type structure
 void read_humidity(bme280_uncomp_data *data)
 {   
-    uint8_t temp[1];
+    uint8_t temp[2];
     uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, temp, 2);
 
     data->humidity = (temp[0] << 8) | temp[1];
 }
 
 //TODO: Change 16bit -> 32bit and add XL values from registers
-// Returns the 16 bit value of the temperature without compensation
-uint16_t get_temperature(void)
+// Returns the 32 bit value of the temperature without compensation
+uint32_t get_temperature(void)
 {
     uint8_t temp_val[1];
     I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp_val, 2);
-    return temp_val = ((uint16_t)temp_val[0] << 8) | temp_val[1];
+    return temp_val = (((uint32_t)temp_val[0] << 8) | temp_val[1]) << 8 | temp_val[2];
 }
 
-// Returns the 16 bit value of the pressure without compensation
+// Returns the 32 bit value of the pressure without compensation
 uint32_t get_pressure(void)
 {
-    uint8_t pres_val[2];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, pres_val, 2);
-    return pres_val = ((uint32_t)pres_val[0] << 8) | pres_val[1];
+    uint8_t pres_val[3];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, pres_val, 3);
+    return pres_val = (((uint32_t)pres_val[0] << 8) | pres_val[1] << 8 | pres_val[2]);
 }
 
 // Returns the 16 bit value of the humidity without compensation
@@ -122,7 +124,7 @@ uint16_t get_humidity(void)
 void read_all(bme280_uncomp_data *data){
     //  Burst read from 0xF7 to 0xFE
     uint8_t temp[8];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_LSB, temp, 8);
+    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_LSB, temp, 8);
 
     data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
     data->temperature = ((temp[3] << 8) | temp[4]) << 8 | temp[5];
@@ -311,18 +313,18 @@ static double compensate_humidity(const bme280_uncomp_data *uncomp_data,
 }
 
 /*  Packaging of read functions  */
-void read_raw_data(void){
-    read_temperature();
-    read_humidity();
-    read_pressure();
+void read_raw_data(bme280_uncomp_data *data){
+    read_temperature(*data);
+    read_humidity(*data);
+    read_pressure(*data);
 }
 
-static void bme280_compensate_data(const struct bme280_uncomp_data *uncomp_data,
+static void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
                                bme280_data *comp_data,
                                bme280_calib_data *calib_data){
     /*  Read calibration data from registers  */
-    read_calibration_data();
-    read_raw_data();
+    read_calibration_data(*calib_data);
+    read_raw_data(*uncomp_data);
 
     if ((uncomp_data != NULL) && (comp_data != NULL) && (calib_data != NULL)){
     /*  Initialize to zero    */

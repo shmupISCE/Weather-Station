@@ -5,7 +5,7 @@
 
 
 #define BME280_CHIP_ID 0x60
-#define BME280_I2C_ADDR UINT8_C(0x76)
+#define BME280_ID_REG 0xD0
 
 #define MEAN_SEA_LEVEL_PRESSURE 1013
 
@@ -47,5 +47,10 @@ uint16_t get_humidity(void);
 void read_temperature(bme280_uncomp_data *data);
 void read_pressure(bme280_uncomp_data *data);
 void read_humidity(bme280_uncomp_data *data);
+
+// State functions 
+void default_sleep_mode(void);
+void default_normal_mode(void);
+
 
 #endif
