@@ -9,7 +9,6 @@
 
 float calculate_lux(void);
 void config_sensor(void);
-uint16_t get_data(void);
 
 
 #endif  //OPT3001_H

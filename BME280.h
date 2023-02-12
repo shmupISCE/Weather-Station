@@ -35,6 +35,31 @@ typedef struct{
 
 }bme280_uncomp_data;
 
+typedef struct{
+  uint16_t dig_T1;
+  int16_t  dig_T2;
+  int16_t  dig_T3;
+
+  uint16_t dig_P1;
+  int16_t  dig_P2;
+  int16_t  dig_P3;
+  int16_t  dig_P4;
+  int16_t  dig_P5;
+  int16_t  dig_P6;
+  int16_t  dig_P7;
+  int16_t  dig_P8;
+  int16_t  dig_P9;
+
+  uint8_t  dig_H1;
+  int16_t  dig_H2;
+  uint8_t  dig_H3;
+  int16_t  dig_H4;
+  int16_t  dig_H5;
+  int8_t   dig_H6;
+  int32_t t_fine;   //Variable to store the intermediate temperature coefficient
+} bme280_calib_data;
+
+
 void read_to_struct(bme280_uncomp_data *data)
 void read_raw_data(void)
 
@@ -47,6 +72,12 @@ uint16_t get_humidity(void);
 void read_temperature(bme280_uncomp_data *data);
 void read_pressure(bme280_uncomp_data *data);
 void read_humidity(bme280_uncomp_data *data);
+
+void read_all(bme280_uncomp_data *data);
+void default_bme280_init(void)
+void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
+                               bme280_data *comp_data,
+                               bme280_calib_data *calib_data);
 
 // State functions 
 void default_sleep_mode(void);

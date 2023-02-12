@@ -45,29 +45,6 @@
 #define BME280_REGISTER_DIG_H5        0xE5
 #define BME280_REGISTER_DIG_H6        0xE7
 
-typedef struct{
-  uint16_t dig_T1;
-  int16_t  dig_T2;
-  int16_t  dig_T3;
-
-  uint16_t dig_P1;
-  int16_t  dig_P2;
-  int16_t  dig_P3;
-  int16_t  dig_P4;
-  int16_t  dig_P5;
-  int16_t  dig_P6;
-  int16_t  dig_P7;
-  int16_t  dig_P8;
-  int16_t  dig_P9;
-
-  uint8_t  dig_H1;
-  int16_t  dig_H2;
-  uint8_t  dig_H3;
-  int16_t  dig_H4;
-  int16_t  dig_H5;
-  int8_t   dig_H6;
-  int32_t t_fine;   //Variable to store the intermediate temperature coefficient
-} bme280_calib_data;
 
 //TODO:     Shift every register with xlsb value to the right for 4 bits
 // Read temperature into bme280 data type structure
@@ -154,7 +131,7 @@ MEASUREMENT TIME = 8 ms
 ODR_max = 1000/8 = 125 Hz
 Cycle time = MEASUREMENT TIME + t_sb = 1008 ms = 1.008s
 */
-void default_init(void){
+void default_bme280_init(void){
     // Sleep mode to get access to all registers
     default_sleep_mode();
     // Set oversampling to x1 for humidity
@@ -170,7 +147,7 @@ void default_init(void){
     P oversampling set to x1
     Forced mode 01                                     */
 void default_forced_mode(){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, FORCED_MODE);
 }
 
 /*  t_sb = 1000ms between 2 measurements    
@@ -329,18 +306,22 @@ static double compensate_humidity(const bme280_uncomp_data *uncomp_data,
 }
 
 /*  Packaging of read functions  */
+/*          SLOW                 */
 void read_raw_data(bme280_uncomp_data *data){
     read_temperature(*data);
     read_humidity(*data);
     read_pressure(*data);
 }
 
-static void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
+void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
                                bme280_data *comp_data,
                                bme280_calib_data *calib_data){
     /*  Read calibration data from registers  */
+    /*  Might not need to read calibration data every iteration*/
+    /*  To read once pull out the function read_calibration_data()    */
     read_calibration_data(*calib_data);
-    read_raw_data(*uncomp_data);
+    // Might not need if already called read_all()
+    //read_all(*uncomp_data);
 
     if ((uncomp_data != NULL) && (comp_data != NULL) && (calib_data != NULL)){
     /*  Initialize to zero    */
