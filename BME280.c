@@ -1,169 +1,98 @@
 #include "BME280.h"
-#include "mcc_generated_files/examples/i2c1_master_example.h"
-
-#define SLEEP_MODE 0x24     // Oversampling set to x1
-#define FORCED_MODE 0x25    // Oversampling set to x1
-#define NORMAL_MODE 0x27    // Oversampling set to x1
-
-#define CTRL_HUM 0xF2       // Humidity control register
-#define STATUS_REG 0xF3 
-#define CTRL_MEAS 0xF4      // Temperature and pressure control register
-#define CONFIG_REG 0xF5
-
-#define PRESS_MSB 0xF7
-#define PRESS_LSB 0xF8
-#define PRESS_XLSB 0xF9
-
-#define TEMP_MSB 0xFA
-#define TEMP_LSB 0xFB
-#define TEMP_XLSB 0xFC
-
-#define HUM_MSB 0xFD
-#define HUM_LSB 0xFE
-
-//Temperature compensations registers
-#define BME280_REGISTER_DIG_T1        0x88
-#define BME280_REGISTER_DIG_T2        0x8A
-#define BME280_REGISTER_DIG_T3        0x8C
-
-//Pressure compensations registers
-#define BME280_REGISTER_DIG_P1        0x8E
-#define BME280_REGISTER_DIG_P2        0x90
-#define BME280_REGISTER_DIG_P3        0x92
-#define BME280_REGISTER_DIG_P4        0x94
-#define BME280_REGISTER_DIG_P5        0x96
-#define BME280_REGISTER_DIG_P6        0x98
-#define BME280_REGISTER_DIG_P7        0x9A
-#define BME280_REGISTER_DIG_P8        0x9C
-#define BME280_REGISTER_DIG_P9        0x9E
-
-//Humidity compensations registers
-#define BME280_REGISTER_DIG_H1        0xA1
-#define BME280_REGISTER_DIG_H2        0xE1
-#define BME280_REGISTER_DIG_H3        0xE3
-#define BME280_REGISTER_DIG_H4        0xE4
-#define BME280_REGISTER_DIG_H5        0xE5
-#define BME280_REGISTER_DIG_H6        0xE7
 
 
-//TODO:     Shift every register with xlsb value to the right for 4 bits
-// Read temperature into bme280 data type structure
 void read_temperature(bme280_uncomp_data *data){
     uint8_t temp[3];
-    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp, 3);
-    data->temperature = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp, 3);
+    data->temperature = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
+    data->temperature = data->temperature >> 4;
 }
 
-// Read pressure into bme280 data type structure
+// Read pressure into BME280 data type structure
 void read_pressure(bme280_uncomp_data *data){
     uint8_t temp[3];
-    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, temp, 3);
-    data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, temp, 3);
+    data->pressure = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
+    data->pressure = data->pressure >> 4;
 }
 
-// Read humidity into bme280 data type structure
+// Read humidity into BME280 data type structure
 void read_humidity(bme280_uncomp_data *data){   
     uint8_t temp[2];
-    uint8_t read_msb = I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, temp, 2);
+    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, temp, 2);
 
-    data->humidity = (temp[0] << 8) | temp[1];
-}
-
-// Returns the 32 bit value of the temperature without compensation
-uint32_t get_temperature(void){
-    uint8_t temp_val[1];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp_val, 2);
-    return temp_val = (((uint32_t)temp_val[0] << 8) | temp_val[1]) << 8 | temp_val[2];
-}
-
-// Returns the 32 bit value of the pressure without compensation
-uint32_t get_pressure(void){
-    uint8_t pres_val[3];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, pres_val, 3);
-    return pres_val = (((uint32_t)pres_val[0] << 8) | pres_val[1] << 8 | pres_val[2]);
-}
-
-// Returns the 16 bit value of the humidity without compensation
-uint16_t get_humidity(void){
-    uint8_t hum_val[1];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, hum_val, 2);
-    return hum_val = ((uint16_t)hum_val[0] << 8) | hum_val[1];
-}
-
-// Burst read of all the data in the data register.
-void read_all(bme280_uncomp_data *data){
-    //  Burst read from 0xF7 to 0xFE
-    uint8_t temp[8];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_LSB, temp, 8);
-
-    data->pressure = ((temp[0] << 8) | temp[1]) << 8 | temp[2];
-    data->temperature = ((temp[3] << 8) | temp[4]) << 8 | temp[5];
-    data->humidity = (temp[6] <<8) | temp[7];
-}
-
-/*  Controls oversampling of humidity data. */
-static void bme280_osrs_h_x1(){
-    uint8_t osrs_h = 0x03;  //  oversampling x1
-    uint8_t reg_value = I2C1_Read1ByteRegister(BME280_CHIP_ID, CTRL_HUM);
-
-    reg_value = reg_value | osrs_h;
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_HUM, reg_value);
-}
-
-/*  Sets the normal mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Normal mode 11                                      */
-void default_normal_mode(void){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, NORMAL_MODE);
-}
-
-/*  Sets the sleep mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Sleep mode 00                                       */
-void default_sleep_mode(void){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, SLEEP_MODE);
+    data->humidity = ((temp[0] << 8) | temp[1]);
 }
 
 /*
-MEASUREMENT TIME = 8 ms
-ODR_max = 1000/8 = 125 Hz
-Cycle time = MEASUREMENT TIME + t_sb = 1008 ms = 1.008s
+*@brief Reads 8 bit register
+*@param reg_addr: register address
+*@return uint8_t value of register
 */
-void default_bme280_init(void){
-    // Sleep mode to get access to all registers
-    default_sleep_mode();
-    // Set oversampling to x1 for humidity
-    bme280_osrs_h_x1();
-    // Set config register do fault values
-    default_config_reg();
-    // Set Forced mode
-    default_forced_mode();
+uint8_t BME280_Read1ByteRegister(uint8_t reg_addr){
+    uint8_t buffer = I2C1_Read1ByteRegister(BME280_CHIP_ID, reg_addr);
+    return buffer;
 }
 
-/*  Sets the forced mode with default oversampling (1x)    
-    T oversampling set to x1
-    P oversampling set to x1
-    Forced mode 01                                     */
-void default_forced_mode(){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CTRL_MEAS, FORCED_MODE);
+/*
+*@brief Reads 16 bit register (or two 8bit registers).
+Can be used to read one 16bit register or two stacked 8bit registers.
+*@param reg_addr: register address
+*@return uint16_t value of registers
+*/
+uint16_t BME280_Read2ByteRegister(uint8_t reg_addr){
+    uint16_t buffer = I2C1_Read2ByteRegister(BME280_CHIP_ID, reg_addr);
+    return buffer;
 }
 
-/*  t_sb = 1000ms between 2 measurements    
-    Filter OFF
-    3-wire SPI mode OFF     */
-void default_config_reg(){
-    uint8_t register = I2C1_Read1ByteRegister(BME280_CHIP_ID, CONFIG_REG);
-    uint8_t preset = 0xA0;
-    preset = preset | register;
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, CONFIG_REG, preset);
+/*
+*@brief Writes 8bit value to 8 bit register
+*@param reg_addr: register address
+*@param data_tw: data to write to register
+*/
+void BME280_Write1ByteRegister(uint8_t reg_addr, uint8_t data_tw){
+    I2C1_Write1ByteRegister(BME280_CHIP_ID, reg_addr, data_tw);
 }
 
-static void read_calibration_data(bme280_calib_data *data) {
+/*
+*@brief Write 16 bit value to 16 bit register (or two 8bit registers).
+*@param reg_addr: register address
+*@param data_tw: data to write to register
+*/
+void BME280_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw){
+    I2C1_Write2ByteRegister(BME280_CHIP_ID, reg_addr, data_tw);
+}
+
+/*
+*@brief ReadnReplace function first reads the value from 8 bit register into a buffer. 
+*Then it changes only the values of specified bits.
+*Can be used to write to a register that has reserved or read only bits.
+*Also can be used to change 1 bit.
+*@param reg_addr: register address
+*@param value: mask to changes specified bits
+*/
+void BME280_ReadnReplace(uint8_t reg_addr, uint8_t value){
+    uint8_t buffer = BME280_Read1ByteRegister(reg_addr);
+    uint8_t new_reg = (buffer | value);
+    BME280_Write1ByteRegister(reg_addr, new_reg);
+}
+/*
+*@brief Initializes the BME280 into forced mode
+*/
+void BME280_init(){
+    BME280_Write1ByteRegister(CTRL_MEAS, BME280_SLEEP_MODE);
+    BME280_ReadnReplace(CTRL_HUM, 0x01);
+    BME280_ReadnReplace(CONFIG_REG, 0x80);
+    BME280_Write1ByteRegister(CTRL_MEAS, BME280_FORCED_MODE);
+    
+}
+
+void BME280_read_calibration_data(bme280_calib_data *data) {
     //Burst read from 0x88 to 0xA1 [0xA0 not used]
-    uint8_t temp_calib[26] = I2C1_ReadDataBlock(BME280_CHIP_ID, BME280_REGISTER_DIG_T1, 26);
-    uint8_t humidity_calib[7] = I2C1_ReadDataBlock(BME280_CHIP_ID,BME280_REGISTER_DIG_H2, 7);
+    uint8_t temp_calib[26];
+    uint8_t humidity_calib[7];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, BME280_REGISTER_DIG_T1, temp_calib, 26);
+    I2C1_ReadDataBlock(BME280_CHIP_ID,BME280_REGISTER_DIG_H2, humidity_calib, 7);
 
     data->dig_T1 = (temp_calib[0] << 8) | temp_calib[1];
     data->dig_T2 = (temp_calib[2] << 8) | temp_calib[3];
@@ -184,156 +113,177 @@ static void read_calibration_data(bme280_calib_data *data) {
     data->dig_H3 = humidity_calib[2];
     data->dig_H4 = (((humidity_calib[3] << 8) | humidity_calib[4]) << 4) | (humidity_calib[5] & 0xF);
     data->dig_H5 = humidity_calib[5];
-    data->dig_H6 = humidity_calib[6]
+    data->dig_H6 = humidity_calib[6];
+}
 
-/*                      *** SLOW ***
-    data->dig_T1 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_T1);
-    data->dig_T2 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_T2);
-    data->dig_T3 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_T3);
-
-    data->dig_P1 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P1);
-    data->dig_P3 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P3);
-    data->dig_P2 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P2);
-    data->dig_P5 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P5);
-    data->dig_P6 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P6);
-    data->dig_P7 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P7);
-    data->dig_P8 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P8);
-    data->dig_P9 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P9);
-    data->dig_P4 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_P4);
-
-    data->dig_H1 = I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H1);
-    data->dig_H2 = I2C1_Read2ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H2);
-    data->dig_H3 = I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H3);
-    data->dig_H4 = (I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H4) << 4) | (I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H4+1) & 0xF);
-    data->dig_H5 = (I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H5+1) << 4) | (I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H5) >> 4);
-    data->dig_H6 = I2C1_Read1ByteRegister(BME280_CHIP_ID, BME280_REGISTER_DIG_H6);
+/*
+*@brief Set operation mode of the device
+*@param BME280_MODE: SLEEP MODE - sets device to sleep mode
+*@param BME280_MODE: FORCED MODE - sets device to forced mode
+*@param BME280_MODE: NORMAL MODE - sets device to normal mode
 */
+void BME280_set_mode(uint8_t BME280_MODE){
+    uint8_t ctrl_meas_reg = BME280_Read1ByteRegister(CTRL_MEAS);
+    ctrl_meas_reg = (ctrl_meas_reg & ~BME280_SENSOR_MODE_MSK) | BME280_MODE;
+    BME280_Write1ByteRegister(CTRL_MEAS, ctrl_meas_reg);
 }
 
-static double compensate_temperature(const bme280_uncomp_data *uncomp_data, bme280_calib_data *calib_data){
-    double var1;
-    double var2;
-    double temperature;
-    double temperature_min = -40;
-    double temperature_max = 85;
+//Test 
+void BME280_change_settings(uint8_t reg, uint8_t setting_mask, uint8_t new_setting){
+    uint8_t reg_val = BME280_Read1ByteRegister(reg);
+    reg_val = (reg_val & ~setting_mask) | new_setting;
+    BME280_Write1ByteRegister(reg, reg_val);
+}
 
-    var1 = ((double)uncomp_data->temperature) / 16384.0 - ((double)calib_data->dig_T1) / 1024.0;
-    var1 = var1 * ((double) calib_data-> dig_T2);
+/*
+*@brief Burst read registers for device configuration 
+*/
+static void bme280_read_settings_reg(bme280_settings_reg* settings){
+    uint8_t register_buffer[4];
+    I2C1_ReadDataBlock(BME280_CHIP_ID, CTRL_HUM, register_buffer, 4);
 
-    var2 = (((double)uncomp_data->temperature) / 131072.0 - ((double) calib_data->dig_T1) / 8192.0);
-    var2 = (var2 * var2) * ((double)calib_data->dig_T3);
-    calib_data->t_fine = (int32_t)(var1 + var2);
-    temperature = (var1 + var2) / 5120.0;
+    settings->ctrl_hum_reg= register_buffer[0];
+    settings->ctrl_meas_reg = register_buffer[2];
+    settings->config_reg= register_buffer[3];
+}
 
-    if (temperature < temperature_min)      {temperature = temperature_min;}
-    else if (temperature > temperature_max) {temperature = temperature_max;}
+void _bme280_get_settings(bme280_num_settings *settings){
+    bme280_settings_reg reg_settings;
+    bme280_read_settings_reg(&reg_settings)
     
-    return temperature;
+    settings-> mode = reg_settings.ctrl_meas_reg | BME280_SENSOR_MODE_MSK;
+    settings-> osrs_p = ((reg_settings.ctrl_meas_reg | BME280_CTRL_PRESS_MSK) << 3) >> 6;
+    settings-> osrs_t = (reg_settings.ctrl_meas_reg | BME280_CTRL_TEMP_MSK) >> 6;
+    
+    settings-> osrs_h = reg_settings.ctrl_hum_reg | BME280_CTRL_HUM_MSK;
+    
+    settings-> spi3w_en = reg_settings.config_reg | BME280_SPI3W_E_MSK;
+    settings-> filter = ((reg_settings.config_reg | BME280_FILTER_MSK) << 3) >> 6;
+    settings-> standby_time = (reg_settings.config_reg | BME280_STANDBY_MSK) >> 6;
 }
 
-static double compensate_pressure(const bme280_uncomp_data  *uncomp_data,
-                                  const bme280_calib_data *calib_data){
-    double var1;
-    double var2;
-    double var3;
-    double pressure;
-    double pressure_min = 30000.0;
-    double pressure_max = 110000.0;
-
-    var1 = ((double)calib_data->t_fine / 2.0) - 64000.0;
-    var2 = var1 * var1 * ((double)calib_data->dig_P6) / 32768.0;
-    var2 = var2 + var1 * ((double)calib_data->dig_P5) * 2.0;
-    var2 = (var2 / 4.0) + (((double)calib_data->dig_P4) * 65536.0);
-    var3 = ((double)calib_data->dig_P3) * var1 * var1 / 524288.0;
-    var1 = (var3 + ((double)calib_data->dig_P2) * var1) / 524288.0;
-    var1 = (1.0 + var1 / 32768.0) * ((double)calib_data->dig_P1);
-
-    // Avoid exception caused by division by zero 
-    if (var1 > (0.0))
-    {
-        pressure = 1048576.0 - (double) uncomp_data->pressure;
-        pressure = (pressure - (var2 / 4096.0)) * 6250.0 / var1;
-        var1 = ((double)calib_data->dig_P9) * pressure * pressure / 2147483648.0;
-        var2 = pressure * ((double)calib_data->dig_P8) / 32768.0;
-        pressure = pressure + (var1 + var2 + ((double)calib_data->dig_P7)) / 16.0;
-
-        if (pressure < pressure_min){
-            pressure = pressure_min;
+void bme280_parse_settings(BME280_DeviceSettings *settings){
+    bme280_num_settings n_settings;
+    _bme280_get_settings(&n_settings);
+    
+    //  Device operational mode
+    switch(n_settings.mode){
+        case BME280_SLEEP_MODE:
+            settings->Mode = "Sleep mode";
+            break;
+        case BME280_FORCED_MODE:
+            settings->Mode = "Forced mode";
+            break;
+        case BME280_NORMAL_MODE:
+            settings->Mode = "Normal mode";
+            break;
         }
-        else if (pressure > pressure_max){
-            pressure = pressure_max;
-        }
+    // Temperature oversampling
+    switch(n_settings.osrs_t){
+        case BME280_NO_OVERSAMPLING:
+            settings->Temperature_oversampling = "OFF";
+            break;
+        case BME280_OVERSAMPLING_1X:
+            settings->Temperature_oversampling = "x1";
+            break;
+        case BME280_OVERSAMPLING_2X:
+            settings->Temperature_oversampling = "x2";
+            break;
+        case BME280_OVERSAMPLING_4X:
+            settings->Temperature_oversampling = "x4";
+            break;
+        case BME280_OVERSAMPLING_8X:
+            settings->Temperature_oversampling = "x8";
+            break;
+        case BME280_OVERSAMPLING_16X:
+            settings->Temperature_oversampling = "x16";
+            break;
     }
-    //Invalid case
-    else {
-        pressure = pressure_min;
+    // Pressure oversampling
+    switch(n_settings.osrs_p){
+        case BME280_NO_OVERSAMPLING:
+            settings->Pressure_oversampling = "OFF";
+            break;
+        case BME280_OVERSAMPLING_1X:
+            settings->Pressure_oversampling = "x1";
+            break;
+        case BME280_OVERSAMPLING_2X:
+            settings->Pressure_oversampling = "x2";
+            break;
+        case BME280_OVERSAMPLING_4X:
+            settings->Pressure_oversampling = "x4";
+            break;
+        case BME280_OVERSAMPLING_8X:
+            settings->Pressure_oversampling = "x8";
+            break;
+        case BME280_OVERSAMPLING_16X:
+            settings->Pressure_oversampling = "x16";
+            break;
     }
-    return pressure;
+    // Humidity oversampling
+    switch(n_settings.osrs_h){
+        case BME280_NO_OVERSAMPLING:
+            settings->Humidity_oversampling= "OFF";
+            break;
+        case BME280_OVERSAMPLING_1X:
+            settings->Humidity_oversampling = "x1";
+            break;
+        case BME280_OVERSAMPLING_2X:
+            settings->Humidity_oversampling = "x2";
+            break;
+        case BME280_OVERSAMPLING_4X:
+            settings->Humidity_oversampling = "x4";
+            break;
+        case BME280_OVERSAMPLING_8X:
+            settings->Humidity_oversampling = "x8";
+            break;
+        case BME280_OVERSAMPLING_16X:
+            settings->Humidity_oversampling = "x16";
+            break;
+    }
+    switch(n_settings.filter){
+        case BME280_FILTER_COEFF_OFF:
+            settings->Filter = "OFF";
+            break;
+        case BME280_FILTER_COEFF_2:
+            settings->Filter = "x2";
+            break;
+        case BME280_FILTER_COEFF_4:
+            settings->Filter = "x4";
+            break;
+        case BME280_FILTER_COEFF_8:
+            settings->Filter = "x8";
+            break;
+        case BME280_FILTER_COEFF_16:
+            settings->Filter = "x16";
+            break;
+    }
+    
+    switch(n_settings.standby_time){
+        case BME280_STANDBY_TIME_0_5_MS:
+            settings->Time_standby = "0.5 ms";
+            break;
+        case BME280_STANDBY_TIME_62_5_MS:
+            settings->Time_standby = "62.5 ms";
+            break;
+        case BME280_STANDBY_TIME_125_MS:
+            settings->Time_standby = "125 ms";
+            break;
+        case BME280_STANDBY_TIME_250_MS:
+            settings->Time_standby = "250 ms";
+            break;
+        case BME280_STANDBY_TIME_500_MS:
+            settings->Time_standby = "500 ms";
+            break;
+        case BME280_STANDBY_TIME_1000_MS:
+            settings->Time_standby = "1000 ms";
+            break;
+        case BME280_STANDBY_TIME_10_MS:
+            settings->Time_standby = "10 ms";
+            break;
+        case BME280_STANDBY_TIME_20_MS:
+            settings->Time_standby = "20 ms";
+            break;
+    }
 }
 
-static double compensate_humidity(const bme280_uncomp_data *uncomp_data,
-                                  const bme280_calib_data *calib_data)
-{
-    double humidity;
-    double humidity_min = 0.0;
-    double humidity_max = 100.0;
-    double var1;
-    double var2;
-    double var3;
-    double var4;
-    double var5;
-    double var6;
-
-    var1 = ((double)calib_data->t_fine) - 76800.0;
-    var2 = (((double)calib_data->dig_H4) * 64.0 + (((double)calib_data->dig_H5) / 16384.0) * var1);
-    var3 = uncomp_data->humidity - var2;
-    var4 = ((double)calib_data->dig_H2) / 65536.0;
-    var5 = (1.0 + (((double)calib_data->dig_H3) / 67108864.0) * var1);
-    var6 = 1.0 + (((double)calib_data->dig_H6) / 67108864.0) * var1 * var5;
-    var6 = var3 * var4 * (var5 * var6);
-    humidity = var6 * (1.0 - ((double)calib_data->dig_H1) * var6 / 524288.0);
-
-    if (humidity > humidity_max)
-    {
-        humidity = humidity_max;
-    }
-    else if (humidity < humidity_min)
-    {
-        humidity = humidity_min;
-    }
-
-    return humidity;
-}
-
-/*  Packaging of read functions  */
-/*          SLOW                 */
-void read_raw_data(bme280_uncomp_data *data){
-    read_temperature(*data);
-    read_humidity(*data);
-    read_pressure(*data);
-}
-
-void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
-                               bme280_data *comp_data,
-                               bme280_calib_data *calib_data){
-    /*  Read calibration data from registers  */
-    /*  Might not need to read calibration data every iteration*/
-    /*  To read once pull out the function read_calibration_data()    */
-    read_calibration_data(*calib_data);
-    // Might not need if already called read_all()
-    //read_all(*uncomp_data);
-
-    if ((uncomp_data != NULL) && (comp_data != NULL) && (calib_data != NULL)){
-    /*  Initialize to zero    */
-    comp_data->temperature = 0;
-    comp_data->pressure = 0;
-    comp_data->humidity = 0;
-
-    /*  Compensate the temperature data  */
-    comp_data->temperature = compensate_temperature(uncomp_data, calib_data);
-    /*  Compensate the pressure data     */
-    comp_data->pressure = compensate_pressure(uncomp_data, calib_data);
-    /*  Compensate the humidity data     */
-    comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
-    }
-}
