@@ -3,7 +3,7 @@
 
 void read_temperature(bme280_uncomp_data *data){
     uint8_t temp[3];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, TEMP_MSB, temp, 3);
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, TEMP_MSB, temp, 3);
     data->temperature = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
     data->temperature = data->temperature >> 4;
 }
@@ -11,7 +11,7 @@ void read_temperature(bme280_uncomp_data *data){
 // Read pressure into BME280 data type structure
 void read_pressure(bme280_uncomp_data *data){
     uint8_t temp[3];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, PRESS_MSB, temp, 3);
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, temp, 3);
     data->pressure = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
     data->pressure = data->pressure >> 4;
 }
@@ -19,7 +19,7 @@ void read_pressure(bme280_uncomp_data *data){
 // Read humidity into BME280 data type structure
 void read_humidity(bme280_uncomp_data *data){   
     uint8_t temp[2];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, HUM_MSB, temp, 2);
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, HUM_MSB, temp, 2);
 
     data->humidity = ((temp[0] << 8) | temp[1]);
 }
@@ -30,7 +30,7 @@ void read_humidity(bme280_uncomp_data *data){
 *@return uint8_t value of register
 */
 uint8_t BME280_Read1ByteRegister(uint8_t reg_addr){
-    uint8_t buffer = I2C1_Read1ByteRegister(BME280_CHIP_ID, reg_addr);
+    uint8_t buffer = I2C1_Read1ByteRegister(BME280_I2C_ADDR, reg_addr);
     return buffer;
 }
 
@@ -41,7 +41,7 @@ Can be used to read one 16bit register or two stacked 8bit registers.
 *@return uint16_t value of registers
 */
 uint16_t BME280_Read2ByteRegister(uint8_t reg_addr){
-    uint16_t buffer = I2C1_Read2ByteRegister(BME280_CHIP_ID, reg_addr);
+    uint16_t buffer = I2C1_Read2ByteRegister(BME280_I2C_ADDR, reg_addr);
     return buffer;
 }
 
@@ -51,7 +51,7 @@ uint16_t BME280_Read2ByteRegister(uint8_t reg_addr){
 *@param data_tw: data to write to register
 */
 void BME280_Write1ByteRegister(uint8_t reg_addr, uint8_t data_tw){
-    I2C1_Write1ByteRegister(BME280_CHIP_ID, reg_addr, data_tw);
+    I2C1_Write1ByteRegister(BME280_I2C_ADDR, reg_addr, data_tw);
 }
 
 /*
@@ -60,7 +60,7 @@ void BME280_Write1ByteRegister(uint8_t reg_addr, uint8_t data_tw){
 *@param data_tw: data to write to register
 */
 void BME280_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw){
-    I2C1_Write2ByteRegister(BME280_CHIP_ID, reg_addr, data_tw);
+    I2C1_Write2ByteRegister(BME280_I2C_ADDR, reg_addr, data_tw);
 }
 
 /*
@@ -80,40 +80,10 @@ void BME280_ReadnReplace(uint8_t reg_addr, uint8_t value){
 *@brief Initializes the BME280 into forced mode
 */
 void BME280_init(){
-    BME280_Write1ByteRegister(CTRL_MEAS, BME280_SLEEP_MODE);
     BME280_ReadnReplace(CTRL_HUM, 0x01);
     BME280_ReadnReplace(CONFIG_REG, 0x80);
     BME280_Write1ByteRegister(CTRL_MEAS, BME280_FORCED_MODE);
     
-}
-
-void BME280_read_calibration_data(bme280_calib_data *data) {
-    //Burst read from 0x88 to 0xA1 [0xA0 not used]
-    uint8_t temp_calib[26];
-    uint8_t humidity_calib[7];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, BME280_REGISTER_DIG_T1, temp_calib, 26);
-    I2C1_ReadDataBlock(BME280_CHIP_ID,BME280_REGISTER_DIG_H2, humidity_calib, 7);
-
-    data->dig_T1 = (temp_calib[0] << 8) | temp_calib[1];
-    data->dig_T2 = (temp_calib[2] << 8) | temp_calib[3];
-    data->dig_T3 = (temp_calib[4] << 8) | temp_calib[5];
-
-    data->dig_P1 = (temp_calib[6] << 8) | temp_calib[7];
-    data->dig_P2 = (temp_calib[8] << 8) | temp_calib[9];
-    data->dig_P3 = (temp_calib[10] << 8) | temp_calib[11];
-    data->dig_P4 = (temp_calib[12] << 8) | temp_calib[13];
-    data->dig_P5 = (temp_calib[14] << 8) | temp_calib[15];
-    data->dig_P6 = (temp_calib[16] << 8) | temp_calib[17];
-    data->dig_P7 = (temp_calib[18] << 8) | temp_calib[19];
-    data->dig_P8 = (temp_calib[20] << 8) | temp_calib[21];
-    data->dig_P9 = (temp_calib[22] << 8) | temp_calib[23];
-
-    data->dig_H1 = temp_calib[25];
-    data->dig_H2 = (humidity_calib[0] << 8) | humidity_calib[1];
-    data->dig_H3 = humidity_calib[2];
-    data->dig_H4 = (((humidity_calib[3] << 8) | humidity_calib[4]) << 4) | (humidity_calib[5] & 0xF);
-    data->dig_H5 = humidity_calib[5];
-    data->dig_H6 = humidity_calib[6];
 }
 
 /*
@@ -140,7 +110,7 @@ void BME280_change_settings(uint8_t reg, uint8_t setting_mask, uint8_t new_setti
 */
 static void bme280_read_settings_reg(bme280_settings_reg* settings){
     uint8_t register_buffer[4];
-    I2C1_ReadDataBlock(BME280_CHIP_ID, CTRL_HUM, register_buffer, 4);
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, CTRL_HUM, register_buffer, 4);
 
     settings->ctrl_hum_reg= register_buffer[0];
     settings->ctrl_meas_reg = register_buffer[2];
@@ -161,6 +131,241 @@ void _bme280_get_settings(bme280_num_settings *settings){
     settings-> filter = ((reg_settings.config_reg | BME280_FILTER_MSK) << 3) >> 6;
     settings-> standby_time = (reg_settings.config_reg | BME280_STANDBY_MSK) >> 6;
 }
+
+static void parse_temp_press_calib_data(bme280_calib_data *calib_data){
+    uint8_t reg_data[26];
+    
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, BME280_TEMP_PRESS_CALIB_DATA_ADDR, reg_data, 26);
+
+    calib_data->dig_t1 = BME280_CONCAT_BYTES(reg_data[1], reg_data[0]);
+    calib_data->dig_t2 = (int16_t)BME280_CONCAT_BYTES(reg_data[3], reg_data[2]);
+    calib_data->dig_t3 = (int16_t)BME280_CONCAT_BYTES(reg_data[5], reg_data[4]);
+    
+    calib_data->dig_p1 = BME280_CONCAT_BYTES(reg_data[7], reg_data[6]);
+    calib_data->dig_p2 = (int16_t)BME280_CONCAT_BYTES(reg_data[9], reg_data[8]);
+    calib_data->dig_p3 = (int16_t)BME280_CONCAT_BYTES(reg_data[11], reg_data[10]);
+    calib_data->dig_p4 = (int16_t)BME280_CONCAT_BYTES(reg_data[13], reg_data[12]);
+    calib_data->dig_p5 = (int16_t)BME280_CONCAT_BYTES(reg_data[15], reg_data[14]);
+    calib_data->dig_p6 = (int16_t)BME280_CONCAT_BYTES(reg_data[17], reg_data[16]);
+    calib_data->dig_p7 = (int16_t)BME280_CONCAT_BYTES(reg_data[19], reg_data[18]);
+    calib_data->dig_p8 = (int16_t)BME280_CONCAT_BYTES(reg_data[21], reg_data[20]);
+    calib_data->dig_p9 = (int16_t)BME280_CONCAT_BYTES(reg_data[23], reg_data[22]);
+    calib_data->dig_h1 = reg_data[25];
+}
+
+static void parse_humidity_calib_data(bme280_calib_data *calib_data){
+    uint8_t reg_data[7];
+    int16_t dig_h4_lsb;
+    int16_t dig_h4_msb;
+    int16_t dig_h5_lsb;
+    int16_t dig_h5_msb;
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, BME280_HUMIDITY_CALIB_DATA_ADDR, reg_data, 7);
+
+    calib_data->dig_h2 = (int16_t)BME280_CONCAT_BYTES(reg_data[1], reg_data[0]);
+    calib_data->dig_h3 = reg_data[2];
+    dig_h4_msb = (int16_t)(int8_t)reg_data[3] * 16;
+    dig_h4_lsb = (int16_t)(reg_data[4] & 0x0F);
+    calib_data->dig_h4 = dig_h4_msb | dig_h4_lsb;
+    dig_h5_msb = (int16_t)(int8_t)reg_data[5] * 16;
+    dig_h5_lsb = (int16_t)(reg_data[4] >> 4);
+    calib_data->dig_h5 = dig_h5_msb | dig_h5_lsb;
+    calib_data->dig_h6 = (int8_t)reg_data[6];
+}
+
+
+void bme280_parse_sensor_data(bme280_uncomp_data *uncomp_data){
+    uint8_t reg_data[8];
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, reg_data, 8);
+    /* Variables to store the sensor data */
+    uint32_t data_xlsb;
+    uint32_t data_lsb;
+    uint32_t data_msb;
+
+    /* Store the parsed register values for pressure data */
+    data_msb = (uint32_t)reg_data[0] << 12;
+    data_lsb = (uint32_t)reg_data[1] << 4;
+    data_xlsb = (uint32_t)reg_data[2] >> 4;
+    uncomp_data->pressure = data_msb | data_lsb | data_xlsb;
+
+    /* Store the parsed register values for temperature data */
+    data_msb = (uint32_t)reg_data[3] << 12;
+    data_lsb = (uint32_t)reg_data[4] << 4;
+    data_xlsb = (uint32_t)reg_data[5] >> 4;
+    uncomp_data->temperature = data_msb | data_lsb | data_xlsb;
+
+    /* Store the parsed register values for humidity data */
+    data_msb = (uint32_t)reg_data[6] << 8;
+    data_lsb = (uint32_t)reg_data[7];
+    uncomp_data->humidity = data_msb | data_lsb;
+}
+
+static uint32_t compensate_pressure(struct bme280_uncomp_data *uncomp_data,
+                                    struct bme280_calib_data *calib_data)
+{
+    int32_t var1;
+    int32_t var2;
+    int32_t var3;
+    int32_t var4;
+    uint32_t var5;
+    uint32_t pressure;
+    uint32_t pressure_min = 30000;
+    uint32_t pressure_max = 110000;
+
+    var1 = (((int32_t)calib_data->t_fine) / 2) - (int32_t)64000;
+    var2 = (((var1 / 4) * (var1 / 4)) / 2048) * ((int32_t)calib_data->dig_p6);
+    var2 = var2 + ((var1 * ((int32_t)calib_data->dig_p5)) * 2);
+    var2 = (var2 / 4) + (((int32_t)calib_data->dig_p4) * 65536);
+    var3 = (calib_data->dig_p3 * (((var1 / 4) * (var1 / 4)) / 8192)) / 8;
+    var4 = (((int32_t)calib_data->dig_p2) * var1) / 2;
+    var1 = (var3 + var4) / 262144;
+    var1 = (((32768 + var1)) * ((int32_t)calib_data->dig_p1)) / 32768;
+
+    /* avoid exception caused by division by zero */
+    if (var1)
+    {
+        var5 = (uint32_t)((uint32_t)1048576) - uncomp_data->pressure;
+        pressure = ((uint32_t)(var5 - (uint32_t)(var2 / 4096))) * 3125;
+
+        if (pressure < 0x80000000){
+            pressure = (pressure << 1) / ((uint32_t)var1);
+        }
+        else{
+            pressure = (pressure / (uint32_t)var1) * 2;
+        }
+
+        var1 = (((int32_t)calib_data->dig_p9) * ((int32_t)(((pressure / 8) * (pressure / 8)) / 8192))) / 4096;
+        var2 = (((int32_t)(pressure / 4)) * ((int32_t)calib_data->dig_p8)) / 8192;
+        pressure = (uint32_t)((int32_t)pressure + ((var1 + var2 + calib_data->dig_p7) / 16));
+
+        if (pressure < pressure_min){
+            pressure = pressure_min;
+        }
+        else if (pressure > pressure_max){
+            pressure = pressure_max;
+        }
+    }
+    else{
+        pressure = pressure_min;
+    }
+    return pressure;
+}
+static uint32_t compensate_humidity(struct bme280_uncomp_data *uncomp_data,
+                                    struct bme280_calib_data *calib_data){
+    int32_t var1;
+    int32_t var2;
+    int32_t var3;
+    int32_t var4;
+    int32_t var5;
+    uint32_t humidity;
+    uint32_t humidity_max = 102400;
+
+    var1 = calib_data->t_fine - ((int32_t)76800);
+    var2 = (int32_t)(uncomp_data->humidity * 16384);
+    var3 = (int32_t)(((int32_t)calib_data->dig_h4) * 1048576);
+    var4 = ((int32_t)calib_data->dig_h5) * var1;
+    var5 = (((var2 - var3) - var4) + (int32_t)16384) / 32768;
+    var2 = (var1 * ((int32_t)calib_data->dig_h6)) / 1024;
+    var3 = (var1 * ((int32_t)calib_data->dig_h3)) / 2048;
+    var4 = ((var2 * (var3 + (int32_t)32768)) / 1024) + (int32_t)2097152;
+    var2 = ((var4 * ((int32_t)calib_data->dig_h2)) + 8192) / 16384;
+    var3 = var5 * var2;
+    var4 = ((var3 / 32768) * (var3 / 32768)) / 128;
+    var5 = var3 - ((var4 * ((int32_t)calib_data->dig_h1)) / 16);
+    var5 = (var5 < 0 ? 0 : var5);
+    var5 = (var5 > 419430400 ? 419430400 : var5);
+    humidity = (uint32_t)(var5 / 4096);
+
+    if (humidity > humidity_max){
+        humidity = humidity_max;
+    }
+    return humidity;
+}
+static uint32_t compensate_pressure(struct bme280_uncomp_data *uncomp_data,
+                                    struct bme280_calib_data *calib_data){
+    int64_t var1;
+    int64_t var2;
+    int64_t var3;
+    int64_t var4;
+    uint32_t pressure;
+    uint32_t pressure_min = 3000000;
+    uint32_t pressure_max = 11000000;
+
+    var1 = ((int64_t)calib_data->t_fine) - 128000;
+    var2 = var1 * var1 * (int64_t)calib_data->dig_p6;
+    var2 = var2 + ((var1 * (int64_t)calib_data->dig_p5) * 131072);
+    var2 = var2 + (((int64_t)calib_data->dig_p4) * 34359738368);
+    var1 = ((var1 * var1 * (int64_t)calib_data->dig_p3) / 256) + ((var1 * ((int64_t)calib_data->dig_p2) * 4096));
+    var3 = ((int64_t)1) * 140737488355328;
+    var1 = (var3 + var1) * ((int64_t)calib_data->dig_p1) / 8589934592;
+
+    /* To avoid divide by zero exception */
+    if (var1 != 0){
+        var4 = 1048576 - uncomp_data->pressure;
+        var4 = (((var4 * INT64_C(2147483648)) - var2) * 3125) / var1;
+        var1 = (((int64_t)calib_data->dig_p9) * (var4 / 8192) * (var4 / 8192)) / 33554432;
+        var2 = (((int64_t)calib_data->dig_p8) * var4) / 524288;
+        var4 = ((var4 + var1 + var2) / 256) + (((int64_t)calib_data->dig_p7) * 16);
+        pressure = (uint32_t)(((var4 / 2) * 100) / 128);
+
+        if (pressure < pressure_min){
+            pressure = pressure_min;
+        }
+        else if (pressure > pressure_max){
+            pressure = pressure_max;
+        }
+    }
+    else{
+        pressure = pressure_min;
+    }
+    return pressure;
+}
+
+
+
+
+void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
+                            bme280_data *comp_data,
+                            bme280_calib_data *calib_data){
+    
+    if ((uncomp_data != NULL) && (comp_data != NULL) && (calib_data != NULL)){
+        /* Initalize to zero */
+        comp_data->temperature = 0;
+        comp_data->pressure = 0;
+        comp_data->humidity = 0;
+
+
+        /* Compensate the temperature data */
+        comp_data->temperature = compensate_temperature(uncomp_data, calib_data);
+        
+        /* Compensate the pressure data */
+        comp_data->pressure = compensate_pressure(uncomp_data, calib_data);
+        
+        /* Compensate the humidity data */
+        comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void bme280_parse_settings(BME280_DeviceSettings *settings){
     bme280_num_settings n_settings;

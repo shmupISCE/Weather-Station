@@ -5,8 +5,11 @@
 extern "C" {
 #endif
 
-#define BME280_CHIP_ID 0X76
-#define BME280_ID_REG 0xD0
+/* I2C addresses */
+#define BME280_I2C_ADDR                           UINT8_C(0x76)
+
+#define BME280_TEMP_PRESS_CALIB_DATA_ADDR         UINT8_C(0x88)
+#define BME280_HUMIDITY_CALIB_DATA_ADDR           UINT8_C(0xE1)
 
 #define CTRL_HUM                                  (0xF2)
 #define STATUS_REG                                (0xF3) 
@@ -24,30 +27,6 @@ extern "C" {
 #define HUM_MSB                                   (0xFD)
 #define HUM_LSB                                   (0xFE)
 
-//Temperature compensations registers
-#define BME280_REGISTER_DIG_T1                    (0x88)
-#define BME280_REGISTER_DIG_T2                    (0x8A)
-#define BME280_REGISTER_DIG_T3                    (0x8C)
-             
-/* )Pressure compensations registers */
-#define BME280_REGISTER_DIG_P1                    (0x8E)
-#define BME280_REGISTER_DIG_P2                    (0x90)
-#define BME280_REGISTER_DIG_P3                    (0x92)
-#define BME280_REGISTER_DIG_P4                    (0x94)
-#define BME280_REGISTER_DIG_P5                    (0x96)
-#define BME280_REGISTER_DIG_P6                    (0x98)
-#define BME280_REGISTER_DIG_P7                    (0x9A)
-#define BME280_REGISTER_DIG_P8                    (0x9C)
-#define BME280_REGISTER_DIG_P9                    (0x9E)
-           
-/* Humidity compensations registers */
-#define BME280_REGISTER_DIG_H1                    (0xA1)
-#define BME280_REGISTER_DIG_H2                    (0xE1)
-#define BME280_REGISTER_DIG_H3                    (0xE3)
-#define BME280_REGISTER_DIG_H4                    (0xE4)
-#define BME280_REGISTER_DIG_H5                    (0xE5)
-#define BME280_REGISTER_DIG_H6                    (0xE7)
-        
 #define BME280_SLEEP_MODE                         UINT8_C(0x00)
 #define BME280_FORCED_MODE                        UINT8_C(0x01)
 #define BME280_NORMAL_MODE                        UINT8_C(0x03)
@@ -113,51 +92,89 @@ typedef struct{
 //Raw sensor measurement data from BME280
 typedef struct{
     /*< un-compensated pressure */
-    int32_t pressure;
+    uint32_t pressure;
 
     /*< un-compensated temperature */
-    int32_t temperature;
+    uint32_t temperature;
 
     /*< un-compensated humidity */
-    uint16_t humidity;
+    uint32_t humidity;
 
 }bme280_uncomp_data;
 
 typedef struct {
     /*< Compensated pressure */
-    float pressure;
+    uint32_t pressure;
 
     /*< Compensated temperature */
-    float temperature;
+    int32_t temperature;
 
     /*< Compensated humidity */
-    float humidity;
+    uint32_t humidity;
 
 }bme280_data;
 
 typedef struct{
-  uint16_t dig_T1;
-  int16_t  dig_T2;
-  int16_t  dig_T3;
+    /*< Calibration coefficient for the temperature sensor */
+    uint16_t dig_t1;
 
-  uint16_t dig_P1;
-  int16_t  dig_P2;
-  int16_t  dig_P3;
-  int16_t  dig_P4;
-  int16_t  dig_P5;
-  int16_t  dig_P6;
-  int16_t  dig_P7;
-  int16_t  dig_P8;
-  int16_t  dig_P9;
+    /*< Calibration coefficient for the temperature sensor */
+    int16_t dig_t2;
+    
+    /*< Calibration coefficient for the temperature sensor */
+    int16_t dig_t3;
+    
+    /*< Calibration coefficient for the pressure sensor */
+    uint16_t dig_p1;
 
-  uint8_t  dig_H1;
-  int16_t  dig_H2;
-  uint8_t  dig_H3;
-  int16_t  dig_H4;
-  int16_t  dig_H5;
-  int8_t   dig_H6;
-  int32_t t_fine;   //Variable to store the intermediate temperature coefficient
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p2;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p3;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p4;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p5;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p6;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p7;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p8;
+
+    /*< Calibration coefficient for the pressure sensor */
+    int16_t dig_p9;
+
+    /*< Calibration coefficient for the humidity sensor */
+    uint8_t dig_h1;
+
+    /*< Calibration coefficient for the humidity sensor */
+    int16_t dig_h2;
+
+    /*< Calibration coefficient for the humidity sensor */
+    uint8_t dig_h3;
+
+    /*< Calibration coefficient for the humidity sensor */
+    int16_t dig_h4;
+
+    /*< Calibration coefficient for the humidity sensor */
+    int16_t dig_h5;
+
+    /*< Calibration coefficient for the humidity sensor */
+    int8_t dig_h6;
+
+    /*< Variable to store the intermediate temperature coefficient */
+    int32_t t_fine;
 } bme280_calib_data;
+
+#define BME280_CONCAT_BYTES(msb, lsb)             (((uint16_t)msb << 8) | (uint16_t)lsb)
+
 
 #ifdef	__cplusplus
 }

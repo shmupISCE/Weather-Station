@@ -12,6 +12,7 @@ void BME280_init(void);
 void BME280_read_calibration_data(bme280_calib_data *data);
 
 void bme280_parse_settings(BME280_DeviceSettings *settings);
+void bme280_parse_sensor_data(bme280_uncomp_data *uncomp_data);
 void BME280_set_mode(uint8_t BME280_MODE);
 
 void read_temperature(bme280_uncomp_data *data);
