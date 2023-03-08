@@ -1,28 +1,8 @@
+#include <builtins.h>
+
 #include "BME280.h"
 
 
-void read_temperature(bme280_uncomp_data *data){
-    uint8_t temp[3];
-    I2C1_ReadDataBlock(BME280_I2C_ADDR, TEMP_MSB, temp, 3);
-    data->temperature = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
-    data->temperature = data->temperature >> 4;
-}
-
-// Read pressure into BME280 data type structure
-void read_pressure(bme280_uncomp_data *data){
-    uint8_t temp[3];
-    I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, temp, 3);
-    data->pressure = (((temp[0] << 8) | temp[1]) << 8 | temp[2]);
-    data->pressure = data->pressure >> 4;
-}
-
-// Read humidity into BME280 data type structure
-void read_humidity(bme280_uncomp_data *data){   
-    uint8_t temp[2];
-    I2C1_ReadDataBlock(BME280_I2C_ADDR, HUM_MSB, temp, 2);
-
-    data->humidity = ((temp[0] << 8) | temp[1]);
-}
 
 /*
 *@brief Reads 8 bit register
@@ -119,7 +99,7 @@ static void bme280_read_settings_reg(bme280_settings_reg* settings){
 
 void _bme280_get_settings(bme280_num_settings *settings){
     bme280_settings_reg reg_settings;
-    bme280_read_settings_reg(&reg_settings)
+    bme280_read_settings_reg(&reg_settings);
     
     settings-> mode = reg_settings.ctrl_meas_reg | BME280_SENSOR_MODE_MSK;
     settings-> osrs_p = ((reg_settings.ctrl_meas_reg | BME280_CTRL_PRESS_MSK) << 3) >> 6;
@@ -172,14 +152,20 @@ static void parse_humidity_calib_data(bme280_calib_data *calib_data){
     calib_data->dig_h6 = (int8_t)reg_data[6];
 }
 
+void BME280_read_calibration_data(bme280_calib_data *calib_data){
+    parse_temp_press_calib_data(&calib_data);
+    parse_humidity_calib_data(&calib_data);  
+}
+
 
 void bme280_parse_sensor_data(bme280_uncomp_data *uncomp_data){
     uint8_t reg_data[8];
-    I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, reg_data, 8);
     /* Variables to store the sensor data */
     uint32_t data_xlsb;
     uint32_t data_lsb;
     uint32_t data_msb;
+    
+    I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, reg_data, 8);
 
     /* Store the parsed register values for pressure data */
     data_msb = (uint32_t)reg_data[0] << 12;
@@ -199,129 +185,76 @@ void bme280_parse_sensor_data(bme280_uncomp_data *uncomp_data){
     uncomp_data->humidity = data_msb | data_lsb;
 }
 
-static uint32_t compensate_pressure(struct bme280_uncomp_data *uncomp_data,
-                                    struct bme280_calib_data *calib_data)
-{
-    int32_t var1;
-    int32_t var2;
-    int32_t var3;
-    int32_t var4;
-    uint32_t var5;
-    uint32_t pressure;
-    uint32_t pressure_min = 30000;
-    uint32_t pressure_max = 110000;
 
-    var1 = (((int32_t)calib_data->t_fine) / 2) - (int32_t)64000;
-    var2 = (((var1 / 4) * (var1 / 4)) / 2048) * ((int32_t)calib_data->dig_p6);
-    var2 = var2 + ((var1 * ((int32_t)calib_data->dig_p5)) * 2);
-    var2 = (var2 / 4) + (((int32_t)calib_data->dig_p4) * 65536);
-    var3 = (calib_data->dig_p3 * (((var1 / 4) * (var1 / 4)) / 8192)) / 8;
-    var4 = (((int32_t)calib_data->dig_p2) * var1) / 2;
-    var1 = (var3 + var4) / 262144;
-    var1 = (((32768 + var1)) * ((int32_t)calib_data->dig_p1)) / 32768;
+void BME280_WakeUp(void){
+    uint8_t reg_val = BME280_Read1ByteRegister(CTRL_MEAS);
+    reg_val = reg_val | BME280_FORCED_MODE;
+    BME280_Write1ByteRegister(CTRL_MEAS, reg_val);
+}
 
-    /* avoid exception caused by division by zero */
-    if (var1)
-    {
-        var5 = (uint32_t)((uint32_t)1048576) - uncomp_data->pressure;
-        pressure = ((uint32_t)(var5 - (uint32_t)(var2 / 4096))) * 3125;
 
-        if (pressure < 0x80000000){
-            pressure = (pressure << 1) / ((uint32_t)var1);
-        }
-        else{
-            pressure = (pressure / (uint32_t)var1) * 2;
-        }
+static BME280_S32_t BME280_compensate_T_int32(bme280_uncomp_data *adc_T, bme280_calib_data *calib_data){
+    BME280_S32_t var1, var2, T;
+    var1 = ((((adc_T->temperature >> 3) - ((BME280_S32_t)calib_data->dig_t1 << 1))) * ((BME280_S32_t)calib_data->dig_t2)) >> 11;
+    var2 = (((((adc_T->temperature >> 4) - ((BME280_S32_t)calib_data->dig_t1)) * ((adc_T->temperature>>4) - ((BME280_S32_t)calib_data->dig_t1)))
+    >> 12) *
+    ((BME280_S32_t)calib_data->dig_t3)) >> 14;
+    calib_data->t_fine = var1 + var2;
+    T = (calib_data->t_fine * 5 + 128) >> 8;
+    return T;
+}
 
-        var1 = (((int32_t)calib_data->dig_p9) * ((int32_t)(((pressure / 8) * (pressure / 8)) / 8192))) / 4096;
-        var2 = (((int32_t)(pressure / 4)) * ((int32_t)calib_data->dig_p8)) / 8192;
-        pressure = (uint32_t)((int32_t)pressure + ((var1 + var2 + calib_data->dig_p7) / 16));
+// Returns pressure in Pa as unsigned 32 bit integer. Output value of ?96386? equals 96386 Pa
+//= 963.86 hPa
+static BME280_U32_t BME280_compensate_P_int32(bme280_uncomp_data *adc_P, bme280_calib_data *calib_data){
+    BME280_S32_t var1, var2;
+    BME280_U32_t p;
 
-        if (pressure < pressure_min){
-            pressure = pressure_min;
-        }
-        else if (pressure > pressure_max){
-            pressure = pressure_max;
-        }
+    var1 = (((BME280_S32_t)calib_data->t_fine) >> 1) - (BME280_S32_t)64000;
+    var2 = (((var1 >> 2) * (var1>>2)) >> 11 ) * ((BME280_S32_t)calib_data->dig_p6);
+    var2 = var2 + ((var1*((BME280_S32_t)calib_data->dig_p5))<<1);
+    var2 = (var2 >> 2) + (((BME280_S32_t)calib_data->dig_p4) << 16);
+    var1 = (((calib_data->dig_p3 * (((var1 >> 2) * (var1 >> 2)) >> 13 )) >> 3) + ((((BME280_S32_t)calib_data->dig_p2) *
+    var1) >> 1)) >> 18;
+    var1 =((((32768 + var1)) * ((BME280_S32_t)calib_data->dig_p1)) >> 15);
+
+    if (var1 == 0){
+    return 0; // avoid exception caused by division by zero
     }
+
+    p = (((BME280_U32_t)(((BME280_S32_t)1048576) - adc_P->pressure) - (var2 >> 12)) )* 3125;
+    if (p < 0x80000000){
+    p = (p << 1) / ((BME280_U32_t)var1);}
     else{
-        pressure = pressure_min;
+    p = (p / (BME280_U32_t)var1) * 2;
     }
-    return pressure;
-}
-static uint32_t compensate_humidity(struct bme280_uncomp_data *uncomp_data,
-                                    struct bme280_calib_data *calib_data){
-    int32_t var1;
-    int32_t var2;
-    int32_t var3;
-    int32_t var4;
-    int32_t var5;
-    uint32_t humidity;
-    uint32_t humidity_max = 102400;
 
-    var1 = calib_data->t_fine - ((int32_t)76800);
-    var2 = (int32_t)(uncomp_data->humidity * 16384);
-    var3 = (int32_t)(((int32_t)calib_data->dig_h4) * 1048576);
-    var4 = ((int32_t)calib_data->dig_h5) * var1;
-    var5 = (((var2 - var3) - var4) + (int32_t)16384) / 32768;
-    var2 = (var1 * ((int32_t)calib_data->dig_h6)) / 1024;
-    var3 = (var1 * ((int32_t)calib_data->dig_h3)) / 2048;
-    var4 = ((var2 * (var3 + (int32_t)32768)) / 1024) + (int32_t)2097152;
-    var2 = ((var4 * ((int32_t)calib_data->dig_h2)) + 8192) / 16384;
-    var3 = var5 * var2;
-    var4 = ((var3 / 32768) * (var3 / 32768)) / 128;
-    var5 = var3 - ((var4 * ((int32_t)calib_data->dig_h1)) / 16);
-    var5 = (var5 < 0 ? 0 : var5);
-    var5 = (var5 > 419430400 ? 419430400 : var5);
-    humidity = (uint32_t)(var5 / 4096);
-
-    if (humidity > humidity_max){
-        humidity = humidity_max;
-    }
-    return humidity;
-}
-static uint32_t compensate_pressure(struct bme280_uncomp_data *uncomp_data,
-                                    struct bme280_calib_data *calib_data){
-    int64_t var1;
-    int64_t var2;
-    int64_t var3;
-    int64_t var4;
-    uint32_t pressure;
-    uint32_t pressure_min = 3000000;
-    uint32_t pressure_max = 11000000;
-
-    var1 = ((int64_t)calib_data->t_fine) - 128000;
-    var2 = var1 * var1 * (int64_t)calib_data->dig_p6;
-    var2 = var2 + ((var1 * (int64_t)calib_data->dig_p5) * 131072);
-    var2 = var2 + (((int64_t)calib_data->dig_p4) * 34359738368);
-    var1 = ((var1 * var1 * (int64_t)calib_data->dig_p3) / 256) + ((var1 * ((int64_t)calib_data->dig_p2) * 4096));
-    var3 = ((int64_t)1) * 140737488355328;
-    var1 = (var3 + var1) * ((int64_t)calib_data->dig_p1) / 8589934592;
-
-    /* To avoid divide by zero exception */
-    if (var1 != 0){
-        var4 = 1048576 - uncomp_data->pressure;
-        var4 = (((var4 * INT64_C(2147483648)) - var2) * 3125) / var1;
-        var1 = (((int64_t)calib_data->dig_p9) * (var4 / 8192) * (var4 / 8192)) / 33554432;
-        var2 = (((int64_t)calib_data->dig_p8) * var4) / 524288;
-        var4 = ((var4 + var1 + var2) / 256) + (((int64_t)calib_data->dig_p7) * 16);
-        pressure = (uint32_t)(((var4 / 2) * 100) / 128);
-
-        if (pressure < pressure_min){
-            pressure = pressure_min;
-        }
-        else if (pressure > pressure_max){
-            pressure = pressure_max;
-        }
-    }
-    else{
-        pressure = pressure_min;
-    }
-    return pressure;
+    var1 = (((BME280_S32_t)calib_data->dig_p9) * ((BME280_S32_t)(((p >> 3) * (p >> 3)) >> 13))) >> 12;
+    var2 = (((BME280_S32_t)(p >> 2)) * ((BME280_S32_t)calib_data->dig_p8)) >> 13;
+    p = (BME280_U32_t)((BME280_S32_t)p + ((var1 + var2 + calib_data->dig_p7) >> 4));
+    return p;
 }
 
+// Returns humidity in %RH as unsigned 32 bit integer in Q22.10 format (22 integer and 10
+//fractional bits).
+// Output value of ?47445? represents 47445/1024 = 46.333 %RH
+static BME280_U32_t BME280_compensate_H_int32(bme280_uncomp_data *adc_H, bme280_calib_data *calib_data){
+    BME280_S32_t v_x1_u32r;
 
+    v_x1_u32r = (calib_data->t_fine - ((BME280_S32_t)76800));
+    v_x1_u32r = (((((adc_H->humidity << 14) - (((BME280_S32_t)calib_data->dig_h4) << 20) - (((BME280_S32_t)calib_data->dig_h5) *
+    v_x1_u32r)) + ((BME280_S32_t)16384)) >> 15) * (((((((v_x1_u32r *
+    ((BME280_S32_t)calib_data->dig_h6)) >> 10) * (((v_x1_u32r * ((BME280_S32_t)calib_data->dig_h3)) >> 11) +
+    ((BME280_S32_t)32768))) >> 10) + ((BME280_S32_t)2097152)) * ((BME280_S32_t)calib_data->dig_h2) +
+    8192) >> 14));
+    
+    v_x1_u32r = (v_x1_u32r - (((((v_x1_u32r >> 15) * (v_x1_u32r >> 15)) >> 7) *
+    ((BME280_S32_t)calib_data->dig_h1)) >> 4));
+    v_x1_u32r = (v_x1_u32r < 0 ? 0 : v_x1_u32r);
+    v_x1_u32r = (v_x1_u32r > 419430400 ? 419430400 : v_x1_u32r);
 
+    return (BME280_U32_t)(v_x1_u32r>>12);
+}
 
 void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
                             bme280_data *comp_data,
@@ -335,35 +268,35 @@ void bme280_compensate_data(const bme280_uncomp_data *uncomp_data,
 
 
         /* Compensate the temperature data */
-        comp_data->temperature = compensate_temperature(uncomp_data, calib_data);
+        comp_data->temperature = BME280_compensate_T_int32(uncomp_data, calib_data);
         
         /* Compensate the pressure data */
-        comp_data->pressure = compensate_pressure(uncomp_data, calib_data);
+        comp_data->pressure = BME280_compensate_P_int32(uncomp_data, calib_data);
         
         /* Compensate the humidity data */
-        comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
+        comp_data->humidity = BME280_compensate_H_int32(uncomp_data, calib_data);
     }
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void BME280_Config(uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t filter, uint8_t t_sb, uint8_t mode){
+    uint8_t ctrl_meas_reg_tw;
+    uint8_t config_reg_tw;
+    uint8_t ctrl_hum_reg_tw;
+    
+    
+    ctrl_meas_reg_tw = ((mode << 6) | (osrs_p << 3) | osrs_t);
+    ctrl_hum_reg_tw  = osrs_h;              // Or read and OR mask
+    config_reg_tw = ((t_sb << 3) | (filter << 2));
+    
+    // Reset 0xB6 0x6B
+    BME280_Write1ByteRegister(0xE0, 0x6B);
+    
+    BME280_Write1ByteRegister(CTRL_MEAS, ctrl_meas_reg_tw);
+    BME280_Write1ByteRegister(CTRL_HUM, ctrl_hum_reg_tw);
+    BME280_Write1ByteRegister(CONFIG_REG, config_reg_tw);
+    
+}
 
 
 
