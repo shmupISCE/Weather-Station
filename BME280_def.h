@@ -80,12 +80,12 @@ typedef struct{
 
 
 typedef struct{
-    char Mode[11];
-    char Temperature_oversampling[5];
-    char Pressure_oversampling[5];
-    char Humidity_oversampling[5];
-    char Filter[5];
-    char Time_standby[5];
+    char *Mode;
+    char *Temperature_oversampling;
+    char *Pressure_oversampling;
+    char *Humidity_oversampling;
+    char *Filter;
+    char *Time_standby;
 }BME280_DeviceSettings;
 
 
@@ -169,9 +169,13 @@ typedef struct{
     /*< Calibration coefficient for the humidity sensor */
     int8_t dig_h6;
 
-    /*< Variable to store the intermediate temperature coefficient */
     int32_t t_fine;
+
 } bme280_calib_data;
+
+typedef int32_t BME280_S32_t;
+typedef uint32_t BME280_U32_t;
+
 
 #define BME280_CONCAT_BYTES(msb, lsb)             (((uint16_t)msb << 8) | (uint16_t)lsb)
 
