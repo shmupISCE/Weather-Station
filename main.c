@@ -27,10 +27,15 @@ void main(void){
     // Initialize the device
     SYSTEM_Initialize();
     
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 069fe2a9022b2a3cf95112ac8b5d713f12fe5c6a
     bme280_calib_data calib_data;
     bme280_uncomp_data uncomp_data;
     bme280_data comp_data;
     
+<<<<<<< HEAD
     BME280_Init();
     BME280_readFactoryCalibration(&calib_data);
             
@@ -44,6 +49,25 @@ void main(void){
         BME280_compensate_data(&uncomp_data, &comp_data, &calib_data);
         BME280_NormalizeMeasurements(&comp_data);
         printf("Temperature: %d \tPressure: %d\tHumidity: %d %%", comp_data.temperature, comp_data.pressure, comp_data.humidity);
+=======
+    BME280_Config(BME280_OVERSAMPLING_1X,
+                  BME280_OVERSAMPLING_1X, 
+                  BME280_OVERSAMPLING_1X, 
+                  BME280_FILTER_COEFF_OFF, 
+                  BME280_STANDBY_TIME_250_MS, 
+                  BME280_SLEEP_MODE);
+    
+
+    BME280_read_calibration_data(&calib_data);
+            
+            
+    while (1) {
+         BME280_WakeUp();   //Forced mode
+         // Read raw data
+         bme280_parse_sensor_data(&uncomp_data);
+         //Compensate raw data and return to data structure bme280_data
+         bme280_compensate_data(&uncomp_data, &comp_data, &calib_data);
+>>>>>>> 069fe2a9022b2a3cf95112ac8b5d713f12fe5c6a
     }
 }
 
