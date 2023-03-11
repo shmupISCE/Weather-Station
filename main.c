@@ -3,17 +3,6 @@
 #include "OPT3001.h"    //Ambient 2 click
 #include <stdio.h>
 
-void single_shot_register(void);
-
-int32_t burst_read_temperature() {
-    int8_t temperature[3];
-    I2C1_ReadDataBlock(BME280_I2C_ADDR, 0xFA, temperature, 3);
-    int32_t temp = ((temperature[0] << 8) | temperature[1]);
-    temp = (temp << 8) | temperature[2];
-    temp = temp >> 4; //  Should work
-    return temp;
-
-}
 
 void print_bme280_settings(BME280_DeviceSettings *settings){
     printf("Temperature oversampling: %s\n", settings->Temperature_oversampling);
@@ -27,10 +16,6 @@ void main(void){
     // Initialize the device
     SYSTEM_Initialize();
     
-<<<<<<< HEAD
-=======
-    
->>>>>>> 069fe2a9022b2a3cf95112ac8b5d713f12fe5c6a
     bme280_calib_data calib_data;
     bme280_uncomp_data uncomp_data;
     bme280_data comp_data;
