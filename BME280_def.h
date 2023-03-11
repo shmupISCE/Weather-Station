@@ -107,12 +107,24 @@ typedef struct {
     uint32_t pressure;
 
     /*< Compensated temperature */
-    int32_t temperature;
+    uint32_t temperature;
 
     /*< Compensated humidity */
     uint32_t humidity;
 
 }bme280_data;
+
+typedef struct {
+    /*< Compensated pressure */
+    float pressure;
+
+    /*< Compensated temperature */
+    float temperature;
+
+    /*< Compensated humidity */
+    float humidity;
+
+}bme280_res;
 
 typedef struct{
     /*< Calibration coefficient for the temperature sensor */
