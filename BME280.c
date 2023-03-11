@@ -250,12 +250,10 @@ static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
         var5 = (uint32_t)((uint32_t)1048576) - uncomp_data->pressure;
         pressure = ((uint32_t)(var5 - (uint32_t)(var2 / 4096))) * 3125;
 
-        if (pressure < 0x80000000)
-        {
+        if (pressure < 0x80000000){
             pressure = (pressure << 1) / ((uint32_t)var1);
         }
-        else
-        {
+        else{
             pressure = (pressure / (uint32_t)var1) * 2;
         }
 
@@ -264,25 +262,23 @@ static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
         pressure = (uint32_t)((int32_t)pressure + ((var1 + var2 + calib_data->dig_p7) / 16));
 
        
-        if (pressure < pressure_min)
-        {
+        if (pressure < pressure_min){
             pressure = pressure_min;
         }
-        else if (pressure > pressure_max)
-        {
+        else if (pressure > pressure_max){
             pressure = pressure_max;
         }
     }
-    else
-    {
+    else{
         pressure = pressure_min;
     }
 
     return pressure;
 }
+
+
 static uint32_t compensate_humidity(bme280_uncomp_data *uncomp_data,
-                                    bme280_calib_data *calib_data)
-{
+                                    bme280_calib_data *calib_data){
     int32_t var1;
     int32_t var2;
     int32_t var3;
@@ -331,7 +327,6 @@ void BME280_compensate_data(bme280_uncomp_data *uncomp_data,
 }
 
 
-
 void BME280_Config(uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t filter, uint8_t t_sb, uint8_t mode){
     uint8_t ctrl_meas_reg_tw;
     uint8_t config_reg_tw;
@@ -358,6 +353,13 @@ void BME280_NormalizeMeasurements(bme280_data *comp_data, bme280_res *res){
     res->humidity = (float)comp_data->humidity / 1024.0;
 }
 
+void print_bme280_settings(BME280_DeviceSettings *settings){
+    printf("Temperature oversampling: %s\n", settings->Temperature_oversampling);
+    printf("Pressure oversampling: %s\n", settings->Pressure_oversampling);
+    printf("Humidity oversampling: %s\n", settings->Humidity_oversampling);
+    printf("Filter: %s\n", settings->Filter);
+    printf("Time standby: %s\n", settings->Time_standby);
+}
 
 void bme280_parse_settings(BME280_DeviceSettings *settings){
     bme280_num_settings n_settings;

@@ -16,7 +16,9 @@ void BME280_ReadnReplace(uint8_t reg_addr, uint8_t value);
 void BME280_Write1ByteRegister(uint8_t reg_addr, uint8_t data_tw);
 void BME280_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw);
 
+//Debug functions
 void bme280_parse_settings(BME280_DeviceSettings *settings);
+void print_bme280_settings(BME280_DeviceSettings *settings);
 
 void BME280_Reset(void);
 void BME280_Init(void);

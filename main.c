@@ -4,14 +4,6 @@
 #include <stdio.h>
 
 
-void print_bme280_settings(BME280_DeviceSettings *settings){
-    printf("Temperature oversampling: %s\n", settings->Temperature_oversampling);
-    printf("Pressure oversampling: %s\n", settings->Pressure_oversampling);
-    printf("Humidity oversampling: %s\n", settings->Humidity_oversampling);
-    printf("Filter: %s\n", settings->Filter);
-    printf("Time standby: %s\n", settings->Time_standby);
-}
-
 void main(void){
     // Initialize the device
     SYSTEM_Initialize();
