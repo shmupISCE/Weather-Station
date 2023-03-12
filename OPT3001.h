@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #define OPT3001_I2C_ADDR                    (0x44)
+#define OPT3001_FULL_SCALE_MODE             (0x00CE)
 
     /*  Registers   */
 #define OPT3001_RESULT_REG                  (0x00)
@@ -34,11 +35,9 @@ uint16_t OPT3001_Read2ByteRegister(uint8_t reg_addr);
 void OPT3001_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw);  
 void OPT3001_ReadnReplace(uint16_t reg_addr, uint16_t value);
 
+void OPT3001_FS_init(void);
 void OPT3001_Config(uint8_t conversion_time, uint8_t conversion_mode, uint8_t fault_counts);
 float OPT3001_calculate_lux(uint16_t data);
-void OPT3001_full_scale_mode(void);
-
-
 
 #ifdef	__cplusplus
 }

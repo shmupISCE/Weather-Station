@@ -168,7 +168,6 @@ void BME280_read_measurement(bme280_uncomp_data *uncomp_data){
     uint32_t data_msb;
     
     uint8_t reg_data[8];
-        
     I2C1_ReadDataBlock(BME280_I2C_ADDR, PRESS_MSB, reg_data, 8);
 
     /* Store the parsed register values for pressure data */
@@ -188,7 +187,6 @@ void BME280_read_measurement(bme280_uncomp_data *uncomp_data){
     data_lsb = (uint32_t)reg_data[7];
     uncomp_data->humidity = data_msb | data_lsb;
 }
-
 
 void BME280_WakeUp_FM(void){
     uint8_t reg_val = BME280_Read1ByteRegister(CTRL_MEAS);
@@ -223,6 +221,7 @@ static int32_t compensate_temperature(bme280_uncomp_data *uncomp_data,
 
     return temperature;
 }
+
 static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
                                     bme280_calib_data *calib_data)
 {
@@ -276,7 +275,6 @@ static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
     return pressure;
 }
 
-
 static uint32_t compensate_humidity(bme280_uncomp_data *uncomp_data,
                                     bme280_calib_data *calib_data){
     int32_t var1;
@@ -311,7 +309,6 @@ static uint32_t compensate_humidity(bme280_uncomp_data *uncomp_data,
     return humidity;
 }
 
-
 void BME280_compensate_data(bme280_uncomp_data *uncomp_data,
                             bme280_data *comp_data,
                             bme280_calib_data *calib_data){
@@ -325,7 +322,6 @@ void BME280_compensate_data(bme280_uncomp_data *uncomp_data,
         /* Compensate the humidity data */
         comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
 }
-
 
 void BME280_Config(uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t filter, uint8_t t_sb, uint8_t mode){
     uint8_t ctrl_meas_reg_tw;
