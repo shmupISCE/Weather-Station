@@ -12,6 +12,7 @@ uint16_t OPT3001_Read2ByteRegister(uint8_t reg_addr){
     uint16_t buffer = I2C1_Read2ByteRegister(OPT3001_I2C_ADDR, reg_addr);
     return buffer;
 }
+
 /*
 *@brief Write 16-bit value to 16-bit register.
 *@param reg_addr: register address
@@ -20,6 +21,7 @@ uint16_t OPT3001_Read2ByteRegister(uint8_t reg_addr){
 void OPT3001_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw){
     I2C1_Write2ByteRegister(OPT3001_I2C_ADDR, reg_addr, data_tw);
 }
+
 /*
 *@brief ReadnReplace function first reads the value from 16-bit register into a buffer. 
 *Then it changes only the values of specified bits.
@@ -33,6 +35,7 @@ void OPT3001_ReadnReplace(uint16_t reg_addr, uint16_t value){
     uint16_t new_reg = (buffer | value);
     OPT3001_Write2ByteRegister(reg_addr, new_reg);
 }
+
 /*
 *@brief Initializes sensor to work in full-scale mode. FS mode is the default mode for sensor.
 *Only use if operational mode changes.
@@ -41,16 +44,18 @@ void OPT3001_FS_init(void){
     //1100 0000 0000 0000
     OPT3001_Write2ByteRegister(OPT3001_CONFIG_REG, OPT3001_FULL_SCALE_MODE);
 }
+
 /*
 *@brief Reads the 2-byte result register and returns the value.
 */
-uint16_t read_data(void)
+uint16_t OPT3001_ReadData(void){
     uint16_t result;
     
     result = OPT3001_Read2ByteRegister(OPT3001_RESULT_REG, buffer, 2);
     result = (buffer[0] << 8) | buffer[1];
     return result;
 }
+
 /*
 *@brief Function that calculates the lux from results in the result register.
 *Lux = exponent * 0.01 * mantissa

@@ -1,7 +1,9 @@
 #include <builtins.h>
-
 #include "BME280.h"
 
+/*
+@brief Sensor power-on reset function
+*/
 void BME280_Reset(void){
     BME280_Write1ByteRegister(0xE0, 0xB6);;
 }
@@ -58,6 +60,7 @@ void BME280_ReadnReplace(uint8_t reg_addr, uint8_t value){
     uint8_t new_reg = (buffer | value);
     BME280_Write1ByteRegister(reg_addr, new_reg);
 }
+
 /*
 *@brief Initializes the BME280 into forced mode
 */
@@ -68,6 +71,7 @@ void BME280_Init(){
                   BME280_FILTER_COEFF_OFF, 
                   BME280_STANDBY_TIME_500_MS, 
                   0x24);
+                  //0x24 -> Normal move with oversampling set to 1x
 }
 
 /*
@@ -101,6 +105,9 @@ static void bme280_read_settings_reg(bme280_settings_reg* settings){
     settings->config_reg= register_buffer[3];
 }
 
+/*
+*@brief Parse each setting from registers and store in data structure
+*/
 void _bme280_get_settings(bme280_num_settings *settings){
     bme280_settings_reg reg_settings;
     bme280_read_settings_reg(&reg_settings);
@@ -116,6 +123,9 @@ void _bme280_get_settings(bme280_num_settings *settings){
     settings-> standby_time = (reg_settings.config_reg | BME280_STANDBY_MSK) >> 6;
 }
 
+/*
+*@brief Parse temperature and pressure calibration data from registers and store in data structure
+*/
 static void parse_temp_press_calib_data(bme280_calib_data *calib_data){
     uint8_t reg_data[26];
     
@@ -137,6 +147,9 @@ static void parse_temp_press_calib_data(bme280_calib_data *calib_data){
     calib_data->dig_h1 = reg_data[25];
 }
 
+/*
+*@brief Parse humidity calibration data from registers and store in data structure
+*/
 static void parse_humidity_calib_data(bme280_calib_data *calib_data){
     uint8_t reg_data[7];
     int16_t dig_h4_lsb;
@@ -156,12 +169,18 @@ static void parse_humidity_calib_data(bme280_calib_data *calib_data){
     calib_data->dig_h6 = (int8_t)reg_data[6];
 }
 
+/*
+*@brief Read factory calibration settings from NVM memory.
+*/
 void BME280_readFactoryCalibration(bme280_calib_data *calib_data){
     parse_temp_press_calib_data(calib_data);
     parse_humidity_calib_data(calib_data);  
 }
 
-
+/*
+*@brief Burst mode reading of sensor measurements from 0xF7 to 0xFE 
+@return Temperature, pressure and humidity measurements.
+*/
 void BME280_read_measurement(bme280_uncomp_data *uncomp_data){    
     uint32_t data_xlsb;
     uint32_t data_lsb;
@@ -188,12 +207,18 @@ void BME280_read_measurement(bme280_uncomp_data *uncomp_data){
     uncomp_data->humidity = data_msb | data_lsb;
 }
 
+/*
+*@brief Sets the sensor to Forced mode measurements. After measurements are complete returns to sleep mode.
+*/
 void BME280_WakeUp_FM(void){
     uint8_t reg_val = BME280_Read1ByteRegister(CTRL_MEAS);
     reg_val = reg_val | BME280_FORCED_MODE;
     BME280_Write1ByteRegister(CTRL_MEAS, reg_val);
 }
 
+/*
+*@brief 32-bit temperature compensation
+*/
 static int32_t compensate_temperature(bme280_uncomp_data *uncomp_data,
                                       bme280_calib_data *calib_data)
 {
@@ -222,6 +247,9 @@ static int32_t compensate_temperature(bme280_uncomp_data *uncomp_data,
     return temperature;
 }
 
+/*
+*@brief 32-bit pressure compensation
+*/
 static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
                                     bme280_calib_data *calib_data)
 {
@@ -275,6 +303,9 @@ static uint32_t compensate_pressure(bme280_uncomp_data *uncomp_data,
     return pressure;
 }
 
+/*
+*@brief 32-bit humidity compensation
+*/
 static uint32_t compensate_humidity(bme280_uncomp_data *uncomp_data,
                                     bme280_calib_data *calib_data){
     int32_t var1;
@@ -309,6 +340,9 @@ static uint32_t compensate_humidity(bme280_uncomp_data *uncomp_data,
     return humidity;
 }
 
+/*
+*@brief Wrapper function for data compensation-
+*/
 void BME280_compensate_data(bme280_uncomp_data *uncomp_data,
                             bme280_data *comp_data,
                             bme280_calib_data *calib_data){
@@ -323,6 +357,16 @@ void BME280_compensate_data(bme280_uncomp_data *uncomp_data,
         comp_data->humidity = compensate_humidity(uncomp_data, calib_data);
 }
 
+/*
+*@brief BME280 configuration function to change sensors settings.
+New settings are written to registers after function is called.
+@param osrs_t: sets the temperature oversampling
+@param osrs_p: sets the pressure oversampling
+@param osrs_h: sets the humidity oversampling
+@param filter: sets the filter coefficients
+@param t_sb: set the stand by time in Normal mode
+@param mode: sets the operational sensor mode.
+*/
 void BME280_Config(uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t filter, uint8_t t_sb, uint8_t mode){
     uint8_t ctrl_meas_reg_tw;
     uint8_t config_reg_tw;
@@ -343,12 +387,18 @@ void BME280_Config(uint8_t osrs_t, uint8_t osrs_p, uint8_t osrs_h, uint8_t filte
     BME280_Write1ByteRegister(CTRL_MEAS, ctrl_meas_reg_tw);
 }
 
+/*
+*@brief Function to standardize raw measurements by returning temperature in celsius, pressure in hPa and humidity in %RH.
+*/
 void BME280_NormalizeMeasurements(bme280_data *comp_data, bme280_res *res){
     res->temperature = (float)comp_data->temperature / 100.0;
     res->pressure = (float)comp_data->pressure / 100.0;
     res->humidity = (float)comp_data->humidity / 1024.0;
 }
 
+/*
+*@brief Print all current settings of the sensor
+*/
 void print_bme280_settings(BME280_DeviceSettings *settings){
     printf("Temperature oversampling: %s\n", settings->Temperature_oversampling);
     printf("Pressure oversampling: %s\n", settings->Pressure_oversampling);
@@ -357,6 +407,9 @@ void print_bme280_settings(BME280_DeviceSettings *settings){
     printf("Time standby: %s\n", settings->Time_standby);
 }
 
+/*
+@brief Parse function to convert numerical (hex) values read from register to strings for easier reading.
+*/
 void bme280_parse_settings(BME280_DeviceSettings *settings){
     bme280_num_settings n_settings;
     _bme280_get_settings(&n_settings);

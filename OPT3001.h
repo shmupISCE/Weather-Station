@@ -30,14 +30,20 @@ extern "C" {
 #define OPT3001_FOUR_FAULT_COUNTS           (0x02)
 #define OPT3001_EIGHT_FAULT_COUNTS          (0x03)
     
-    
+// Read-Write functions
 uint16_t OPT3001_Read2ByteRegister(uint8_t reg_addr);    
 void OPT3001_Write2ByteRegister(uint8_t reg_addr, uint16_t data_tw);  
 void OPT3001_ReadnReplace(uint16_t reg_addr, uint16_t value);
 
+//Configuration functions
 void OPT3001_FS_init(void);
 void OPT3001_Config(uint8_t conversion_time, uint8_t conversion_mode, uint8_t fault_counts);
+
+//Raw data and lux calculation
 float OPT3001_calculate_lux(uint16_t data);
+uint16_t OPT3001_ReadData(void)
+
+
 
 #ifdef	__cplusplus
 }
